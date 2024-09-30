@@ -112,12 +112,12 @@ const loginUser = asyncHandler(async (req, res) => {
             $or: [{ username }, { email }]
         });
         if (!user) {
-            throw new ApiError(404, "User not found");
+            return new ApiError(404, "User not found");
         }
 
         const isPasswordValid = await user.isPasswordCorrect(password);
         if (!isPasswordValid) {
-            throw new ApiError(401, "Invalid User credentials");
+            return new ApiError(401, "Invalid User credentials");
         }
 
         // Properly destructure tokens from the function
@@ -144,7 +144,7 @@ const loginUser = asyncHandler(async (req, res) => {
                 "User Logged In Successfully"
             ));
     } catch (error) {
-        new ApiError(400, error?.message || "something went wrong while logging user out")
+        return new ApiError(400, error?.message || "something went wrong while logging user out")
     }
 });
 
@@ -224,9 +224,62 @@ const refreshAccessToken = asyncHandler(async(req, res) =>{
     }
 })
 
+const changeCurrentPassword = asyncHandler(async(req, res) =>{
+    try {
+        const {oldPassword, newPassword} = req.body
+    
+        const user = await User.findById(req?.user._id)
+    
+        const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    
+        if(!isPasswordCorrect){
+            throw new ApiError(400, "Password is incorrect")
+        }
+    
+        user.password = newPassword
+        await user.save({validateBeforeSave: false})
+    
+        return res.status(200).json(new ApiResponse(200, {}, "password updated successfully"))
+    } catch (error) {
+        return new ApiError(500, "Something went wrong while changing password")
+    }
+
+})
+
+const getCurrentUser = asyncHandler(async (req, res) =>{
+    return res.status(200).json(new ApiResponse(200, req.user, "get user successfully"))
+})
+
+const updateAccountDetails = asyncHandler(async(req, res)=>{
+    try {
+        const {fullname, email} = req.body
+    
+        if(!fullname || !email){
+            throw new ApiError(400, "Please provide All fields")
+        }
+    
+        const user = await User.findByIdAndUpdate(req.user._id,
+            {
+                $set: {
+                    fullname,
+                    email
+                }
+            },
+            { new: true }
+        ).select("-password")
+    
+        return res.status(200).json(new ApiResponse(200, user, "Account Details Updated Sucessfully"))
+    } catch (error) {
+        return new ApiError(500, "Something went wrong while updating details")
+    }
+})
+
 export{
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails
 }
